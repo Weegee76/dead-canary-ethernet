@@ -1,57 +1,42 @@
-# 🕊️ Dead Canary
+# Ethernet Dead Canary
+This is based off of [another GitHub project by rockettpunk.][1]
 
-A LAN-connected watchdog using an ESP32 that safely shuts down your NAS or server when power is lost — like a literal canary in a server mine.
+That project was intended for homelab use with multiple servers that may not work with typical UPS software, so it provided a standard solution that any linux machine could use to verify the state of power to the building. The idea is to program an ESP32-based dev board to serve a simple webserver that always responds the same to an HTTP request.
 
-UPDATED TO INCLUDE SCREEN AND WIFI FALLBACKS
----
+The problem for me was that using WiFi seemed counterproductive to an actual rack environment, where I can instead directly wire it with ethernet. Thus, [a W5500 ethernet module][3] and one of my [favorite ESP32 form factors later][2], I built a simple device and wrote a new arduino sketch while using pretty much the same linux script.
 
-## What is it?
+## Working principle
+An ESP32 hosts a web server and is connected to the network via a network cable. Computers ping the server every minute and check to see if they get a response. If no response is recieved for too long, the server initiates a shutdown command, as that is an indication of power loss behind the UPS.
 
-My Zimacube Pro server (MU/TH/UR) runs on a basic UPS without NUT or similar connectivity. I wanted a reliable, local-only way to detect when the **power goes out** — and shut things down cleanly before ZFS could cry.
+The specific timings and network details are designed to be user-configurable.
 
-Enter: **Dead Canary**  
-An ESP32 sits on the same power strip as the NAS (but **not** on the UPS), and serves a local `/` endpoint returning `"CHIRP"`. When that chirp goes silent, the NAS knows it’s time to go dark.
-
-NOW WITH TIMESTAMPS IN THE LOG, AND FULL DELAYED WOL
----
-
-## What You Need
-
-- ESP32 development board
-- Arduino IDE
-- A Linux server or NAS
-- Local Wi-Fi
-- (Optional) Hipster film cannister for housing
-
----
-
-## How It Works
-
-### ESP32 Firmware
-- Connects to Wi-Fi
-- Hosts a webserver on port 80
-- Responds to `http://CANARY_IP/` with `"CHIRP"`
-
-### Server Watchdog
-- Cron job pings the canary every minute
-- If no chirp in 5 minutes, triggers:
-  ```bash
-  shutdown -h now
-
-
-
-
+## Required Hardware
+- An ESP32-based development board, I used the [Adafruit model 5700][2]
+- W5500 Ethernet module, I used [this one from Amazon][3]
+- A breadboard/protoboard/perfboard to put it all together.
+- Bonus points if you 3D print a nice enclosure.
 
 ## Installation
+### ESP32 Setup
+Simply connect your ESP32 board to your computer and upload the sketch `canary-ethernet.ino` with the Arduino IDE. Be sure to adjust the user-defined variables at the top and adjust it to your needs. The ethernet module uses the SPI interface, follow the instructions to hook up your specific model.
 
-### 1. Flash the ESP32 with `canary-esp32.ino`
+Some of these variables are:
+- Network information
+- Ethernet chip CS pin
+- MAC Addresses for magic packets/wake time (optional)
+- CPU clock speed (optional)
+- Disable WiFi/Bluetooth flag (optional)
 
-- Update `ssid` and `password` with your Wi-Fi credentials
-- Upload the sketch using Arduino IDE
-- Use Serial Monitor to see the assigned IP
+By default, all radio communication is disabled as it is not needed, and the CPU is clocked down as it saves power. You must set the appropriate network details though, as well as the CS pin that you have connected via your breadboard/protoboard solution. I hard-soldered my parts together on a protoboard.
 
-### 2. Install the watchdog script on your NAS/sever
+Once it's all set up, connect it to the MAINS POWER (not the UPS) to ensure proper detection. The board should lose power when the building does, and the servers must live past that for a little while!
 
+Then, connect the network cable.
+
+### Server setup
+Set up the script `canary-watchdog.sh` on your linux server and then set up a cron job to run it. Make sure you modify the canary IP and other user variables at the top to match your setup. As described by the [original project:][1]
+
+---
 Place the script:
 
 ```bash
@@ -75,50 +60,21 @@ Then add this line:
 ```cron
 * * * * * /usr/local/bin/canary-watchdog.sh >> /var/log/canary-watchdog.log 2>&1
 ```
-
 ---
+I also set up a rotating log with mine to save disk space over time. If you also want Wake-on-LAN, you will need to set up your server to accept magic packets.
 
-## 🧪 Testing
+### Testing
+You can simulate power loss by either unplugging the network cable or the power cable to the ESP board. After the specified threshold time (default is 5 minutes) your servers should safely shut down.
 
-To simulate power loss:
+You can view the logs with `tail -f /var/log/canary-watchdog.log`.
 
-- Unplug the ESP32 or disconnect its Wi-Fi
-- After 5 minutes of silence, the NAS will shut down
-- (Optional) Replace `shutdown -h now` with a log echo to test safely
+## Contributing
+Feel free to submit issues or pull requests to fix issues with the code, or if you feel this guide is incomplete in some way.
 
----
+## License
+Following on the open-source nature of the original project, this is licensed under the [MIT License][4]
 
-## Bonus Layer
-
-- I used [Uptime Kuma](https://github.com/louislam/uptime-kuma) to monitor the Canary IP.
-- If the MU/TH/UR is still up but Kuma alerts me, I know the ESP has been unplugged (likely by Arnold the cat).
-
----
-
-## Final Notes
-
-- ESP32 must **not** be powered by the UPS
-- No cloud dependencies
-- Local, autonomous, and extremely reliable
-
-
----
-
-## Build
-
-### Dead Canary in Hand
-![Dead Canary in Hand](20250603_155956.jpg)
-
-### Mounted to Power Strip (VHB-taped, not on UPS)
-![Dead Canary Mounted](20250603_170120.jpg)
-
-### Fake Shutdown Test Confirmed
-![Canary Log Output](image%20(1).jpg)
-
-### Updated Log output
-![Canary Log Output update](Updated_Log.png)
-
-
-
-
-
+[1]: https://github.com/rockettpunk/dead-canary
+[2]: https://www.adafruit.com/product/5700
+[3]: https://www.amazon.com/HiLetgo-Ethernet-Network-Interface-WIZ820io/dp/B08KXM8TKJ?sr=8-3
+[4]: https://en.wikipedia.org/wiki/MIT_License
