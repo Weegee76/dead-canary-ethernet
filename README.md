@@ -71,10 +71,6 @@ You can view the logs with `tail -f /var/log/canary-watchdog.log`.
 ## Contributing
 Feel free to submit issues or pull requests to fix issues with the code, or if you feel this guide is incomplete in some way.
 
-## License
-Following on the open-source nature of the original project, this is licensed under the [MIT License][4]
-
 [1]: https://github.com/rockettpunk/dead-canary
 [2]: https://www.adafruit.com/product/5700
 [3]: https://www.amazon.com/HiLetgo-Ethernet-Network-Interface-WIZ820io/dp/B08KXM8TKJ?sr=8-3
-[4]: https://en.wikipedia.org/wiki/MIT_License
